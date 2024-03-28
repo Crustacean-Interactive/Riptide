@@ -178,7 +178,7 @@ namespace Riptide
         /// <summary>Handles an incoming connection attempt.</summary>
         private void HandleConnectionAttempt(object _, ConnectedEventArgs e)
         {
-            e.Connection.Initialize(this, defaultTimeout);
+            e.Connection.Initialize(this, defaultTimeout, default);
         }
 
         /// <summary>Handles a connect message.</summary>
@@ -396,15 +396,15 @@ namespace Riptide
         /// <summary>Disconnects a specific client.</summary>
         /// <param name="id">The numeric ID of the client to disconnect.</param>
         /// <param name="message">Data that should be sent to the client being disconnected. Use <see cref="Message.Create()"/> to get an empty message instance.</param>
-        public void DisconnectClient(ushort id, Message message = null)
+        public void DisconnectClient(ushort id, Message message = null, DisconnectReason disconnectReason = DisconnectReason.Kicked)
         {
             if (message != null && message.ReadBits != 0)
                 RiptideLogger.Log(LogType.Error, LogName, $"Use the parameterless 'Message.Create()' overload when setting disconnection data!");
 
             if (clients.TryGetValue(id, out Connection client))
             {
-                SendDisconnect(client, DisconnectReason.Kicked, message);
-                LocalDisconnect(client, DisconnectReason.Kicked);
+                SendDisconnect(client, disconnectReason, message);
+                LocalDisconnect(client, disconnectReason);
             }
             else
                 RiptideLogger.Log(LogType.Warning, LogName, $"Couldn't disconnect client {id} because it wasn't connected!");

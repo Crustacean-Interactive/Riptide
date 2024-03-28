@@ -7,9 +7,35 @@ using Riptide.Transports;
 using Riptide.Utils;
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 namespace Riptide
 {
+    public enum UserPlatform : byte
+    {
+        STEAM = 1,
+        META_QUEST = 2,
+        META_PC = 3,
+
+        SIDEQUEST = 100,
+    }
+
+    public enum UserPriviledgeLevel
+    {
+        USER,
+        MODERATOR,
+        ADMIN,
+        DEVELOPER
+    }
+
+    public class CrustaceanUserData
+    {
+        public string DisplayName;
+        public string SumHash;
+        public ulong CrustaceanID;
+        public UserPlatform Platform;
+    }
+
     /// <summary>The state of a connection.</summary>
     internal enum ConnectionState : byte
     {
@@ -120,6 +146,18 @@ namespace Riptide
         /// <summary>The time at which the currently pending ping was sent.</summary>
         private long pendingPingSendTime;
 
+        // ======================
+        //  Crustacean Additions
+        // ======================
+        public CrustaceanUserData UserData { get; private set; }
+
+        public string DisplayName => UserData.DisplayName;
+        public string SumHash => UserData.SumHash;
+        public ulong CrustaceanID => UserData.CrustaceanID;
+        public UserPlatform Platform => UserData.Platform;
+
+        public UserPriviledgeLevel PriviledgeLevel = UserPriviledgeLevel.USER;
+
         /// <summary>Initializes the connection.</summary>
         protected Connection()
         {
@@ -134,18 +172,19 @@ namespace Riptide
             MaxAvgSendAttempts = 5;
             AvgSendAttemptsResilience = 64;
             MaxSendAttempts = 15;
-            MaxNotifyLoss = 0.05f; // 5%
-            NotifyLossResilience = 64;
+            MaxNotifyLoss = 0.2f; // Default was 0.05F
+            NotifyLossResilience = 256; // Default was 64
             pendingMessages = new Dictionary<ushort, PendingMessage>();
         }
 
         /// <summary>Initializes connection data.</summary>
         /// <param name="peer">The <see cref="Riptide.Peer"/> which this connection belongs to.</param>
         /// <param name="timeoutTime">The timeout time.</param>
-        internal void Initialize(Peer peer, int timeoutTime)
+        internal void Initialize(Peer peer, int timeoutTime, CrustaceanUserData userData)
         {
             Peer = peer;
             TimeoutTime = timeoutTime;
+            UserData = userData;
         }
 
         /// <summary>Resets the connection's timeout time.</summary>
@@ -350,6 +389,13 @@ namespace Riptide
             if (Id != id)
                 RiptideLogger.Log(LogType.Error, Peer.LogName, $"Client has assumed ID {id} instead of {Id}!");
 
+            UserData = new CrustaceanUserData();
+
+            UserData.DisplayName = message.GetString();
+            UserData.SumHash = message.GetString();
+            UserData.CrustaceanID = message.GetULong();
+            UserData.Platform = (UserPlatform)message.GetByte();
+
             state = ConnectionState.Connected;
             ResetTimeout();
             return true;
@@ -394,7 +440,12 @@ namespace Riptide
         private void RespondWelcome()
         {
             Message message = Message.Create(MessageHeader.Welcome);
+
             message.AddUShort(Id);
+            message.AddString(DisplayName);
+            message.AddString(SumHash);
+            message.AddULong(CrustaceanID);
+            message.AddByte((byte)Platform);
 
             Send(message);
         }
